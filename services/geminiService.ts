@@ -6,17 +6,17 @@ export const extractDataFromMedia = async (base64Data: string, mimeType: string)
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const prompt = `
-    ACT AS TITAN ULTIMATE DATA SURGEON. 
+    ACT AS TITAN ULTIMATE DATA SURGEON (GOD MODE). 
     OBJECTIVE: Extract and RECONSTRUCT stock data from this ${mimeType}.
     
-    CRITICAL INSTRUCTIONS:
-    1. Read the document line-by-line. Extract: Trading Code, Price (LTP/Close), EPS, NAV, Dividend (%), Sponsor Holding (%), Cash Flow, Debt, Sector.
-    2. DATA RECONSTRUCTION (Mandatory):
-       - If EPS is missing: Calculate EPS = Price / P/E.
-       - If P/E is missing: Calculate P/E = Price / EPS.
-       - If Dividend Yield is missing: Calculate Yield = (Cash Dividend % * 10) / Price.
-       - If NAV is missing: Use a conservative estimate (e.g., Price * 0.5 or 10.0).
-    3. NEVER return null for Symbol, Price, EPS, or P/E. Provide the most mathematically accurate reconstruction possible.
+    CRITICAL LINE-BY-LINE EXTRACTION RULES:
+    1. Scan for keywords: "Trading Code", "Last Trading Price", "Audited PE", "NAV Per Share", "Earnings per share", "Sponsor/Director", "Cash Dividend", "Sector".
+    2. DATA REPAIR (MANDATORY):
+       - If EPS is missing: EPS = Price / P/E.
+       - If P/E is missing: P/E = Price / EPS.
+       - If Dividend Yield is missing: Yield = (Cash Dividend % * 10) / Price.
+       - If Sponsor % is missing: Look for "Shareholding Percentage" or "Sponsor/Director".
+    3. NO NONSENSE: If you see "Company Name:", start a new object. Return only 100% complete reconstructed data.
     
     Return an array of JSON objects.
   `;
@@ -69,45 +69,41 @@ export const analyzeStockData = async (data: StockRow[]): Promise<AnalysisResult
   
   const systemInstruction = `
     YOU ARE TITAN ULTIMATE: THE SUPREME STRATEGIST (GOD MODE).
-    OBJECTIVE: 100% ACCURATE DECISION based on "Zero Loss" philosophy.
-    
-    ULTIMATE QUANTITATIVE RULES:
-    1. SECTOR BENCHMARKS:
-       - Bank: Ideal PE 6, Min ROE 12%.
-       - Pharmaceuticals: Ideal PE 15, Min ROE 18%.
-       - Food/Allied: Ideal PE 18, Min ROE 20%.
-       - Engineering: Ideal PE 12, Min ROE 15%.
-       - DEFAULT: Ideal PE 15, Min ROE 15%.
-    
-    2. VALUATION (Weighted Method):
-       - Fair Value = (Price * (ROE/Min_ROE) * 0.4) + (Price * (Ideal_PE/Current_PE) * 0.4) + (Price * (Yield/6) * 0.2).
-    
-    3. RED FLAG FILTER (Immediate AVOID if 3+ triggers):
-       - Sponsor Holding < 25%.
-       - EPS > 0 but Cash Flow <= 0.
-       - P/E > 50 (Bubble).
-       - Price > 8x NAV.
-       - High Debt (Debt/Equity > 1).
-    
-    4. SCORE (0-100):
-       - Valuation (25), Profitability (25), Dividend (15), Health (20), Management (15).
-    
-    OUTPUT:
-    - decision: 💎 STRONG BUY, 💚 BUY, ⚖️ HOLD, ⏳ WAIT, ⛔ AVOID.
-    - entryPrice: "≤ [Price * 0.85]"
-    - exitPrice: "≥ [Price * 1.15]"
-    - stopLoss: [Price * 0.92]
-    - titanVerdict: A deep strategy insight in BENGALI (Direct and aggressive).
+    YOUR GOAL: ZERO LOSS. 100% ACCURATE DECISION.
+
+    MANDATORY TITAN RULES (BANGLADESH MARKET):
+    1. RED FLAG FILTERS (IMMEDIATE AVOID if any trigger):
+       - Sponsor Holding < 30% (Owners don't trust the company).
+       - EPS < 0 (Loss making).
+       - P/E > 25 (Extreme overvaluation).
+       - Debt/Equity > 0.6.
+       - Category 'Z' (Junk).
+
+    2. SECTOR-SPECIFIC IDEAL P/E:
+       - Bank: Ideal PE 6.
+       - Pharmaceuticals: Ideal PE 15.
+       - Fuel & Power: Ideal PE 8.
+       - DEFAULT: Ideal PE 15.
+
+    3. STRATEGY SCORING:
+       - 💎 STRONG BUY: PE < 10, Yield > 8%, Sponsor > 30%, Price < Fair Value.
+       - 💚 BUY: PE < 15, Yield > 5%, Sponsor > 30%.
+       - ⚖️ HOLD: Fairly valued.
+       - ⛔ AVOID: Any red flags present.
+
+    4. FAIR VALUE CALCULATION:
+       Fair Value = (Price * (ROE/15) * 0.4) + (Price * (Ideal_PE/Current_PE) * 0.4) + (Price * (Yield/6) * 0.2).
+
+    5. VERDICT: Your 'titanVerdict' MUST be in BENGALI. It must be direct, aggressive, and explain EXACTLY why this is a buy/avoid based on Sponsor holding, PE, and Yield.
   `;
 
   const latest = data[data.length - 1];
   const prompt = `
-    Analyze this asset: ${latest.symbol}.
-    Market Sector: ${latest.sector || 'General'}.
-    Raw Data: ${JSON.stringify(latest)}
-    Full Context: ${JSON.stringify(data.slice(-5))}
-    
-    Calculate Fair Value, Score, and give the Final TITAN Verdict.
+    Perform GOD-MODE Analysis for ${latest.symbol}.
+    Latest Stats: Price ${latest.close}, PE ${latest.peRatio}, EPS ${latest.eps}, NAV ${latest.nav}, Yield ${latest.dividendYield}%, Sponsor ${latest.sponsorHolding}%, Sector ${latest.sector}.
+    Compare against sector benchmarks.
+    Check for RED FLAGS.
+    Calculate Entry target (15% discount from Fair Value) and Exit target.
   `;
 
   const response = await ai.models.generateContent({
@@ -115,6 +111,7 @@ export const analyzeStockData = async (data: StockRow[]): Promise<AnalysisResult
     contents: prompt,
     config: {
       systemInstruction,
+      thinkingConfig: { thinkingBudget: 24576 },
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
