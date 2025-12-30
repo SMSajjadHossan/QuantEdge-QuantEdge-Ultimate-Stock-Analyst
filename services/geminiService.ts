@@ -9,14 +9,14 @@ export const extractDataFromMedia = async (base64Data: string, mimeType: string)
     ACT AS TITAN ULTIMATE DATA SURGEON (GOD MODE). 
     OBJECTIVE: Extract and RECONSTRUCT stock data from this ${mimeType}.
     
-    CRITICAL LINE-BY-LINE EXTRACTION RULES:
-    1. Scan for keywords: "Trading Code", "Last Trading Price", "Audited PE", "NAV Per Share", "Earnings per share", "Sponsor/Director", "Cash Dividend", "Sector".
-    2. DATA REPAIR (MANDATORY):
+    CRITICAL LINE-BY-LINE RULES:
+    1. Read every line. Extract: Trading Code, Last Trading Price (LTP), Audited PE, NAV, EPS, Sponsor Holding %, Cash Dividend, Sector.
+    2. MATHEMATICAL DATA REPAIR (MANDATORY):
        - If EPS is missing: EPS = Price / P/E.
        - If P/E is missing: P/E = Price / EPS.
-       - If Dividend Yield is missing: Yield = (Cash Dividend % * 10) / Price.
-       - If Sponsor % is missing: Look for "Shareholding Percentage" or "Sponsor/Director".
-    3. NO NONSENSE: If you see "Company Name:", start a new object. Return only 100% complete reconstructed data.
+       - If Dividend Yield is missing: Calculate (Cash Div % * 10) / Price.
+       - If NAV is missing: Estimate conservatively (Price * 0.5 or 10.0).
+    3. NO NULLS: Reconstruct data mathematically so the analyst has a 100% complete dataset.
     
     Return an array of JSON objects.
   `;
@@ -59,7 +59,7 @@ export const extractDataFromMedia = async (base64Data: string, mimeType: string)
     const parsed = JSON.parse(response.text || "[]");
     return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    console.error("Extraction Error:", e);
+    console.error("Extraction Surgery Failed:", e);
     return [];
   }
 };
@@ -69,41 +69,38 @@ export const analyzeStockData = async (data: StockRow[]): Promise<AnalysisResult
   
   const systemInstruction = `
     YOU ARE TITAN ULTIMATE: THE SUPREME STRATEGIST (GOD MODE).
-    YOUR GOAL: ZERO LOSS. 100% ACCURATE DECISION.
+    PHILOSOPHY: ZERO LOSS. 100% SECURE DECISIONS.
 
-    MANDATORY TITAN RULES (BANGLADESH MARKET):
-    1. RED FLAG FILTERS (IMMEDIATE AVOID if any trigger):
-       - Sponsor Holding < 30% (Owners don't trust the company).
-       - EPS < 0 (Loss making).
-       - P/E > 25 (Extreme overvaluation).
-       - Debt/Equity > 0.6.
-       - Category 'Z' (Junk).
-
-    2. SECTOR-SPECIFIC IDEAL P/E:
-       - Bank: Ideal PE 6.
+    TITAN QUANTITATIVE RULES (BANGLADESH MARKET):
+    1. SECTOR BENCHMARKS:
+       - Banks: Ideal PE 6. (Must Avoid if PE > 10).
        - Pharmaceuticals: Ideal PE 15.
+       - Food & Allied: Ideal PE 18.
        - Fuel & Power: Ideal PE 8.
        - DEFAULT: Ideal PE 15.
 
-    3. STRATEGY SCORING:
-       - 💎 STRONG BUY: PE < 10, Yield > 8%, Sponsor > 30%, Price < Fair Value.
-       - 💚 BUY: PE < 15, Yield > 5%, Sponsor > 30%.
-       - ⚖️ HOLD: Fairly valued.
-       - ⛔ AVOID: Any red flags present.
+    2. RED FLAG FILTER (MANDATORY AVOID):
+       - Sponsor Holding < 30%: Immediate AVOID. Owners don't trust it.
+       - EPS < 0: Immediate AVOID. Loss making.
+       - Cash Flow <= 0: Potential accounting fraud.
+       - Price > 8x NAV: Bubble risk.
 
-    4. FAIR VALUE CALCULATION:
+    3. WEIGHTED FAIR VALUE:
        Fair Value = (Price * (ROE/15) * 0.4) + (Price * (Ideal_PE/Current_PE) * 0.4) + (Price * (Yield/6) * 0.2).
 
-    5. VERDICT: Your 'titanVerdict' MUST be in BENGALI. It must be direct, aggressive, and explain EXACTLY why this is a buy/avoid based on Sponsor holding, PE, and Yield.
+    4. ACTIONABLE DECISIONS:
+       - 💎 STRONG BUY: Score > 80, No Red Flags, Under Fair Value, Sponsor > 30%.
+       - ⛔ AVOID: Any red flag detected.
+    
+    5. BENGALI VERDICT: Your 'titanVerdict' MUST be in BENGALI. It must be aggressive, direct, and explain EXACTLY why this is a trap or a gem. Mention Sponsor %, PE, and Yield specifically.
   `;
 
   const latest = data[data.length - 1];
   const prompt = `
-    Perform GOD-MODE Analysis for ${latest.symbol}.
-    Latest Stats: Price ${latest.close}, PE ${latest.peRatio}, EPS ${latest.eps}, NAV ${latest.nav}, Yield ${latest.dividendYield}%, Sponsor ${latest.sponsorHolding}%, Sector ${latest.sector}.
-    Compare against sector benchmarks.
-    Check for RED FLAGS.
-    Calculate Entry target (15% discount from Fair Value) and Exit target.
+    Execute GOD-MODE Analysis for ${latest.symbol}.
+    Latest Extraction Metrics: Price ${latest.close}, PE ${latest.peRatio}, EPS ${latest.eps}, NAV ${latest.nav}, Yield ${latest.dividendYield}%, Sponsor ${latest.sponsorHolding}%, Sector ${latest.sector}.
+    Compare against Sector Benchmarks. Check Red Flags. Calculate 0-100 Score.
+    Output Entry/Exit Limits and Bengali Verdict.
   `;
 
   const response = await ai.models.generateContent({
@@ -111,7 +108,7 @@ export const analyzeStockData = async (data: StockRow[]): Promise<AnalysisResult
     contents: prompt,
     config: {
       systemInstruction,
-      thinkingConfig: { thinkingBudget: 24576 },
+      thinkingConfig: { thinkingBudget: 32768 },
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
