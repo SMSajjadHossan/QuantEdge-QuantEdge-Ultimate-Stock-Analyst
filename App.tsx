@@ -181,4 +181,36 @@ const App: React.FC = () => {
               <div className="flex gap-6 items-center">
                 <div className="flex flex-col items-end">
                    <span className="text-[10px] text-zinc-600 font-black uppercase mb-2 tracking-widest">Integrity Status</span>
-                   <span className="bg-blue-500/10 text-blue-400 px-5 py-2.5 rounded-2xl text-[11px] font-black border border-blue-
+                   <span className="bg-blue-500/10 text-blue-400 px-5 py-2.5 rounded-2xl text-[11px] font-black border border-blue-500/20 flex items-center gap-3">
+                     <i className="fas fa-check-double"></i>
+                     DATA_RECONSTRUCTED_100%
+                   </span>
+                </div>
+                <button 
+                  onClick={() => { setAnalysis(null); setData([]); }}
+                  className="w-16 h-16 bg-zinc-800 hover:bg-zinc-700 rounded-3xl flex items-center justify-center text-zinc-400 transition-all border border-zinc-700 shadow-lg"
+                >
+                  <i className="fas fa-undo-alt"></i>
+                </button>
+              </div>
+            </div>
+            <AnalysisView result={analysis} history={data || []} />
+          </div>
+        )}
+      </main>
+
+      <footer className="fixed bottom-0 left-0 right-0 bg-zinc-950/90 backdrop-blur-2xl border-t border-zinc-900 py-6 px-10 flex justify-between items-center z-40">
+        <div className="flex items-center gap-4">
+          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+          <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.4em]">Titan Ultimate Intelligence • Production v6.0</span>
+        </div>
+        <div className="flex gap-8">
+          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">128-bit Quant Logic</span>
+          <span className="text-[10px] font-mono text-emerald-500/40 uppercase tracking-widest">Encrypted Stream</span>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+export default App;

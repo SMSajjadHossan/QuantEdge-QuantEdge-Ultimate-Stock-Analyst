@@ -15,6 +15,13 @@ export interface StockRow {
   [key: string]: any;
 }
 
+// MissingDataField interface for tracking data reconstruction and validation errors
+export interface MissingDataField {
+  rowIdx: number;
+  field: string;
+  symbol: string;
+}
+
 export interface TitanChecklist {
   peUnder15: boolean;
   dividendAbove7: boolean;
