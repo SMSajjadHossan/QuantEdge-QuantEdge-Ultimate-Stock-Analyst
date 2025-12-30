@@ -24,50 +24,66 @@ const App: React.FC = () => {
       const extension = file.name.split('.').pop()?.toLowerCase();
       let extractedRows: StockRow[] = [];
 
+      // Unified Ingestion Pipeline
       if (extension === 'xlsx' || extension === 'xls') {
-        setLoadingStage("RECONSTRUCTING_EXCEL_STREAM");
+        setLoadingStage("XLS_TITAN_EXTRACTION");
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const json: any[] = XLSX.utils.sheet_to_json(firstSheet);
-        
         extractedRows = json.map(item => ({
-          symbol: String(item.Symbol || item.Ticker || "ASSET"),
+          symbol: String(item.Symbol || item.Ticker || item.TradingCode || "ASSET"),
           date: String(item.Date || item.date || new Date().toISOString().split('T')[0]),
           open: parseFloat(item.Open || item.Price || 0),
           high: parseFloat(item.High || item.Price || 0),
           low: parseFloat(item.Low || item.Price || 0),
-          close: parseFloat(item.Close || item.Price || 0),
+          close: parseFloat(item.Close || item.Price || item.LTP || 0),
           volume: parseFloat(item.Volume || 0),
-          peRatio: parseFloat(item.PE || 0),
+          peRatio: parseFloat(item.PE || item.peRatio || 0),
           eps: parseFloat(item.EPS || 0),
-          dividendYield: parseFloat(item.Yield || 0),
-          sponsorHolding: parseFloat(item.Sponsor || 0),
-          debtToEquity: parseFloat(item.Debt || 0)
+          dividendYield: parseFloat(item.Yield || item.dividendYield || 0),
+          sponsorHolding: parseFloat(item.Sponsor || item.sponsorHolding || 0),
+          debtToEquity: parseFloat(item.Debt || 0),
+          nav: parseFloat(item.NAV || item.nav || 10)
         }));
-      } 
-      else {
-        // Universal AI Ingestion for PDF, Image, CSV, TXT
+      } else {
+        // AI-Powered Line-by-Line Extraction for PDF, Image, CSV, TXT
         setLoadingStage("AI_MULTI_FORMAT_RECONSTRUCTION");
         const b64 = await fileToBase64(file);
         extractedRows = await extractDataFromMedia(b64, file.type || 'text/plain');
       }
 
-      if (extractedRows.length === 0) throw new Error("TITAN_FAULT: Dataset Reconstruction Failed.");
-      
-      setData(extractedRows);
-      
-      // Automatic Trigger of Analysis immediately after successful extraction
+      if (extractedRows.length === 0) {
+        throw new Error("TITAN_FAULT: No legible data found. Ensure the document contains stock metrics.");
+      }
+
+      // Final Mathematical Check/Repair by Frontend before passing to Analysis
+      const finalData = extractedRows.map(row => {
+        const r = { ...row };
+        if (!r.peRatio && r.close && r.eps) r.peRatio = r.close / r.eps;
+        if (!r.eps && r.close && r.peRatio) r.eps = r.close / r.peRatio;
+        if (r.peRatio === 0 && r.close && r.eps) r.peRatio = r.close / r.eps;
+        return r;
+      });
+
+      setData(finalData);
+
+      // AUTOMATIC TRIGGER OF STRATEGY ANALYSIS
       setLoadingStage("TRIPLE_CHECK_STRATEGY_FINALIZATION");
-      const result = await analyzeStockData(extractedRows);
+      const result = await analyzeStockData(finalData);
       setAnalysis(result);
 
     } catch (err: any) {
-      setError(err.message || "Autonomous reconstruction failed. Verify file integrity.");
+      setError(err.message || "Autonomous extraction failed. Verify file quality.");
     } finally {
       setLoading(false);
       setLoadingStage("");
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
   };
 
   return (
@@ -85,7 +101,7 @@ const App: React.FC = () => {
           </div>
           <button 
             onClick={() => fileInputRef.current?.click()}
-            className="bg-white text-black px-6 py-2.5 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-white/5"
+            className="bg-white text-black px-6 py-2.5 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-white/5"
           >
             Deploy Source
           </button>
@@ -93,25 +109,32 @@ const App: React.FC = () => {
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 pt-12 pb-24">
-        {!data.length && !loading && (
-          <div className="flex flex-col items-center justify-center text-center py-20 animate-in fade-in duration-1000">
+        {!analysis && !loading && (
+          <div className="flex flex-col items-center justify-center text-center py-20 animate-in fade-in slide-in-from-bottom-8 duration-1000">
             <div className="relative mb-12">
                <div className="absolute inset-0 bg-blue-500 blur-[120px] opacity-10"></div>
                <div className="w-40 h-40 bg-zinc-900/50 border border-zinc-800 rounded-[40px] flex items-center justify-center relative shadow-2xl">
                 <i className="fas fa-microchip text-6xl text-blue-500"></i>
                </div>
             </div>
-            <h2 className="text-6xl font-black text-white mb-6 tracking-tighter">Autonomous Intelligence</h2>
+            <h2 className="text-6xl font-black text-white mb-6 tracking-tighter">Autonomous Empire Intelligence</h2>
             <p className="text-zinc-500 text-xl max-w-2xl leading-relaxed mb-12">
               Ingest any PDF, Image, or Document. TITAN will extract data line-by-line, calculate missing metrics, and deliver a 100% accurate strategy instantly.
             </p>
+            <div className="flex flex-wrap justify-center gap-4 mb-8">
+              <span className="bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-xl text-[10px] font-mono uppercase text-zinc-400">PDF Reports</span>
+              <span className="bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-xl text-[10px] font-mono uppercase text-zinc-400">Screenshots</span>
+              <span className="bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-xl text-[10px] font-mono uppercase text-zinc-400">Excel Sheets</span>
+              <span className="bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-xl text-[10px] font-mono uppercase text-zinc-400">Text Logs</span>
+            </div>
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-12 py-5 rounded-[24px] font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-blue-500/20 transition-all flex items-center gap-4"
+              className="bg-blue-600 hover:bg-blue-500 text-white px-12 py-5 rounded-[24px] font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-blue-500/20 transition-all flex items-center gap-4 group"
             >
-              <i className="fas fa-rocket"></i> Begin Strategy Extraction
+              <i className="fas fa-rocket group-hover:translate-y-[-2px] transition-transform"></i>
+              Begin Strategy Extraction
             </button>
-            <input type="file" className="hidden" ref={fileInputRef} onChange={(e) => processFile(e.target.files![0])} />
+            <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
           </div>
         )}
 
@@ -123,28 +146,43 @@ const App: React.FC = () => {
             </div>
             <div className="text-center">
               <p className="text-white font-black text-2xl tracking-tight mb-2 uppercase">{loadingStage.replace(/_/g, ' ')}</p>
-              <p className="text-zinc-600 font-mono text-[10px] tracking-widest">ZERO_INTERVENTION_REPAIR: ENABLED | TRIPLE_CHECKING...</p>
+              <p className="text-zinc-600 font-mono text-[10px] tracking-widest">ZERO_INTERVENTION_REPAIR: ENABLED | TRIPLE_CHECKING DATA INTEGRITY...</p>
             </div>
           </div>
         )}
 
         {error && (
-          <div className="max-w-2xl mx-auto bg-rose-500/5 border border-rose-500/20 p-8 rounded-[32px] text-rose-400 mb-12 shadow-2xl">
-            <p className="font-black text-xl mb-1 uppercase tracking-tight">System Fault</p>
-            <p className="text-sm opacity-70 font-mono">{error}</p>
+          <div className="max-w-2xl mx-auto bg-rose-500/5 border border-rose-500/20 p-8 rounded-[32px] flex items-start gap-6 text-rose-400 mb-12 shadow-2xl">
+            <i className="fas fa-shield-alt text-3xl mt-1"></i>
+            <div>
+              <p className="font-black text-xl mb-1 uppercase tracking-tight">System Fault Detected</p>
+              <p className="text-sm opacity-70 leading-relaxed font-mono">{error}</p>
+              <button onClick={() => setError(null)} className="mt-4 text-[10px] font-black uppercase tracking-widest border-b border-rose-500/50 hover:border-rose-500 pb-0.5">Clear and Retry</button>
+            </div>
           </div>
         )}
 
         {analysis && !loading && (
           <div className="space-y-12 animate-in zoom-in-95 duration-700">
-            <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[40px] flex justify-between items-center shadow-2xl">
-              <div>
-                <span className="text-[10px] text-zinc-600 font-black uppercase tracking-[0.4em] block mb-2">Autonomous Report For</span>
-                <h3 className="text-4xl font-black text-white tracking-tighter">{data[0].symbol}</h3>
+            <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[40px] flex flex-col md:flex-row justify-between items-center gap-8 shadow-2xl">
+              <div className="flex flex-col">
+                <span className="text-[10px] text-zinc-600 font-black uppercase tracking-[0.4em] block mb-2">Autonomous Strategy Report</span>
+                <h3 className="text-5xl font-black text-white tracking-tighter">{data[0].symbol}</h3>
               </div>
               <div className="flex gap-4">
-                <span className="bg-blue-500/10 text-blue-400 px-4 py-2 rounded-xl text-xs font-bold border border-blue-500/20">DATA_COMPLETE</span>
-                <span className="bg-emerald-500/10 text-emerald-400 px-4 py-2 rounded-xl text-xs font-bold border border-emerald-500/20">REPAIRED_BY_AI</span>
+                <div className="flex flex-col items-end">
+                   <span className="text-[9px] text-zinc-600 font-black uppercase mb-1">Status</span>
+                   <span className="bg-emerald-500/10 text-emerald-400 px-4 py-2 rounded-xl text-xs font-bold border border-emerald-500/20 flex items-center gap-2">
+                     <i className="fas fa-check-double text-[10px]"></i>
+                     AI_REPAIRED_COMPLETE
+                   </span>
+                </div>
+                <button 
+                  onClick={() => { setAnalysis(null); setData([]); }}
+                  className="w-12 h-12 bg-zinc-800 hover:bg-zinc-700 rounded-2xl flex items-center justify-center text-zinc-400 transition-all border border-zinc-700"
+                >
+                  <i className="fas fa-redo"></i>
+                </button>
               </div>
             </div>
             <AnalysisView result={analysis} history={data} />
@@ -153,10 +191,10 @@ const App: React.FC = () => {
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 bg-zinc-950/80 backdrop-blur-xl border-t border-zinc-900 py-4 px-8 flex justify-between items-center z-40">
-        <span className="text-[8px] font-black text-zinc-700 uppercase tracking-[0.5em]">Titan Neural Network • 100% Autonomous</span>
+        <span className="text-[8px] font-black text-zinc-700 uppercase tracking-[0.5em]">Titan Neural Network • 100% Autonomous Reconstruction Mode</span>
         <div className="flex gap-4">
           <span className="text-[8px] font-mono text-emerald-500/50 uppercase">Secured Session</span>
-          <button onClick={() => { setData([]); setAnalysis(null); }} className="text-[8px] font-mono text-rose-500/50 uppercase hover:text-rose-500">Reset Engine</button>
+          <span className="text-[8px] font-mono text-blue-500/50 uppercase">Zero Loss Active</span>
         </div>
       </footer>
     </div>

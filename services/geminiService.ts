@@ -10,13 +10,15 @@ export const extractDataFromMedia = async (base64Data: string, mimeType: string)
     OBJECTIVE: Extract and RECONSTRUCT stock data from this ${mimeType}.
     
     CRITICAL INSTRUCTION:
-    If any field (Close, PE, EPS, Sponsor Holding) is missing, YOU MUST CALCULATE IT using financial formulas:
-    - If PE and Close are present, calculate EPS (EPS = Close / PE).
-    - If Close and EPS are present, calculate PE (PE = Close / EPS).
-    - If specific fundamental metrics are missing from the table but industry context is available, use logical estimation to provide a 100% COMPLETE DATASET.
-    - NEVER leave a null value. Provide the most accurate mathematical reconstruction possible.
+    1. Read every line and identify financial markers (LTP, Close, P/E, EPS, NAV, Dividend, Sponsor Holding, Category).
+    2. If any critical field is missing, YOU MUST CALCULATE OR DERIVE IT:
+       - EPS missing? Calculate from Price / PE.
+       - PE missing? Calculate from Price / EPS.
+       - Dividend Yield missing? Calculate from (Cash Dividend % * 10) / Price.
+       - If specific data is unreadable, estimate based on the "Bangladesh Market Alpha" (e.g., standard NAV of 10 if missing but price is low, or historical context).
+    3. NEVER leave a null value for Close, PE, EPS, or Sponsor Holding. Provide a 100% complete reconstructed matrix.
     
-    Map headers dynamically: 'Price'/'LTP' -> 'close', 'Directors' -> 'sponsorHolding', 'Profit' -> 'eps'.
+    Map headers: 'Trading Code' -> 'symbol', 'Last Trading Price'/'LTP' -> 'close', 'Net Asset Value' -> 'nav'.
     Return an array of JSON objects.
   `;
 
@@ -44,7 +46,8 @@ export const extractDataFromMedia = async (base64Data: string, mimeType: string)
             sponsorHolding: { type: Type.NUMBER },
             dividendYield: { type: Type.NUMBER },
             debtToEquity: { type: Type.NUMBER },
-            nav: { type: Type.NUMBER }
+            nav: { type: Type.NUMBER },
+            category: { type: Type.STRING }
           },
           required: ["symbol", "date", "close", "peRatio", "eps", "sponsorHolding"]
         }
@@ -52,30 +55,50 @@ export const extractDataFromMedia = async (base64Data: string, mimeType: string)
     }
   });
 
-  return JSON.parse(response.text || "[]");
+  try {
+    return JSON.parse(response.text || "[]") as StockRow[];
+  } catch (e) {
+    console.error("Extraction Parse Error:", e);
+    return [];
+  }
 };
 
 export const analyzeStockData = async (data: StockRow[]): Promise<AnalysisResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const systemInstruction = `
-    YOU ARE TITAN: THE SUPREME STRATEGIST.
-    OBJECTIVE: 100% ACCURATE DECISION based on the reconstructed data.
+    YOU ARE TITAN: THE SUPREME EMPIRE STRATEGIST & QUANT.
+    OBJECTIVE: 100% ACCURATE DECISION based on "Zero Loss" philosophy.
     
-    TITAN RULES:
-    1. P/E Ratio < 15 = UNDEVALUED.
-    2. Dividend > 7% = CASH FLOW KING.
-    3. Sponsor > 30% = OWNERSHIP TRUST.
-    4. Debt < 0.5 = FINANCIAL HEALTH.
+    TITAN MASTER RULES (Bengali Context):
+    1. P/E Ratio: < 15 is Undervalued (Green). > 40 is a Trap.
+    2. Dividend Yield: > 7% is mandatory for "Cash Flow King" status.
+    3. Sponsor Holding: MUST be > 30%. If owners are selling, we are not buying.
+    4. EPS Growth: Must be increasing over 3-5 years. Avoid "Z" category junk.
+    5. NAV Safety: Price near NAV is safer.
     
-    TRIPLE-CHECK the mathematical consistency of the provided data before final verdict.
-    Response must be JSON with a deep 'titanVerdict' in Bengali.
+    TRIPLE-CHECK VALIDATION:
+    - Cross-verify PE vs Price/EPS.
+    - Check for "Dividend Traps" (Yield > ROE).
+    - Remove "Hype" influence.
+    
+    OUTPUT:
+    - Provide a decision: STRONG_BUY, BUY, HOLD, SELL, STRONG_SELL.
+    - Provide a 'titanVerdict' in BENGALI that is aggressive, direct, and strategic.
   `;
 
+  const latestData = data[data.length - 1];
   const prompt = `
-    Analyze this asset: ${data[0]?.symbol}. 
-    Metrics provided: ${JSON.stringify(data.slice(-10))}
-    Provide the final "Empire Build" decision.
+    Analyze this asset: ${latestData.symbol}. 
+    Data Set (Extracted & Repaired): ${JSON.stringify(data.slice(-20))}
+    
+    Current Stats:
+    - Price: ${latestData.close}
+    - P/E: ${latestData.peRatio}
+    - Yield: ${latestData.dividendYield}%
+    - Sponsor: ${latestData.sponsorHolding}%
+    
+    Give me the final TITAN STRATEGY result.
   `;
 
   const response = await ai.models.generateContent({
@@ -112,5 +135,5 @@ export const analyzeStockData = async (data: StockRow[]): Promise<AnalysisResult
     }
   });
 
-  return JSON.parse(response.text || "{}");
+  return JSON.parse(response.text || "{}") as AnalysisResult;
 };
