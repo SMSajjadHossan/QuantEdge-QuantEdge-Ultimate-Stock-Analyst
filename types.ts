@@ -2,18 +2,16 @@
 export interface StockRow {
   symbol: string;
   date: string;
-  open: number | null;
-  high: number | null;
-  low: number | null;
-  close: number | null;
-  volume: number | null;
-  peRatio?: number | null;
-  eps?: number | null;
-  dividendYield?: number | null;
-  sponsorHolding?: number | null;
-  debtToEquity?: number | null;
-  nav?: number | null;
-  category?: 'A' | 'B' | 'Z' | 'N/A';
+  close: number;
+  peRatio: number;
+  eps: number;
+  nav: number;
+  dividendYield: number;
+  sponsorHolding: number;
+  cashFlow?: number;
+  debt?: number;
+  sector?: string;
+  category?: string;
   [key: string]: any;
 }
 
@@ -27,20 +25,18 @@ export interface TitanChecklist {
 }
 
 export interface AnalysisResult {
-  decision: 'STRONG_BUY' | 'BUY' | 'HOLD' | 'SELL' | 'STRONG_SELL';
+  decision: string;
+  bucket: string;
   confidence: number;
-  riskRating: 'LOW' | 'MEDIUM' | 'HIGH';
+  riskRating: string;
   summary: string;
   pros: string[];
   cons: string[];
   targetPrice: number;
   stopLoss: number;
+  entryPrice: string;
+  exitPrice: string;
   checklist: TitanChecklist;
-  titanVerdict: string; // The "Bengali" deep insight
-}
-
-export interface MissingDataField {
-  rowIdx: number;
-  field: string;
-  symbol: string;
+  titanVerdict: string;
+  score: number;
 }
